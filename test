@@ -1,0 +1,68 @@
+const { Client, GatewayIntentBits, Collection } = require("discord.js");
+
+const Perspective = require("perspective-api-client");
+const perspective = new Perspective({
+  apiKey: "AIzaSyDZhDCVhfq9Yu8ty35gwsFPKhV52Kx54iU",
+});
+
+const client = new Client({
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.GuildMembers,
+    GatewayIntentBits.MessageContent,
+  ],
+});
+
+client.punishments = new Collection();
+
+client.on("ready", () => {
+  console.log(`Logged in as ${client.user.tag}!`);
+});
+
+client.on("messageCreate", async (message) => {
+  if (message.author.bot) return;
+
+  const result = await perspective.analyze({
+    comment: { text: message.content },
+    languages: ["ar", "en", "ru"],
+    requestedAttributes: { PROFANITY: {}, TOXICITY: {} },
+  });
+  console.log(JSON.stringify(result, null, 2));
+  if (!result || !result.attributeScores || !result.attributeScores.TOXICITY)
+    return;
+  const score = result.attributeScores.PROFANITY.summaryScore.value && result.attributeScores.TOXICITY.summaryScore.value;
+  if (score > 0.6) {
+    console.log(
+      `Toxic message: "${message.content}" Message toxicity score is "${
+        score * 100
+      }%"`
+    );
+    // 5 minutes// 5 minutes
+    const punishments = (client.punishments.get(message.author.id) || 0) + 1;
+    client.punishments.set(message.author.id, punishments);
+    // Calculate timeout duration
+    const time = 1000 * 60 * 5 * punishments;
+
+    console.log(time);
+    message.delete();
+    message.member
+      .timeout(time, "Toxic Message detected using our AI")
+      .then(() => {
+        message.channel.send(
+          `User <@${message.author.id}> has been timed out for ${
+            punishments * 5
+          } minutes`
+        );
+      })
+      .catch((err) => {
+        console.error(err);
+      });
+  }
+
+  
+});
+
+client.login(
+  "MTAxMzIwNzEwMzI2OTI0MDg2Mw.GMS_Rx.Z9D-Q5PszEVQ08IwPyicQQHUe626X8dc3J8-Ag"
+);
